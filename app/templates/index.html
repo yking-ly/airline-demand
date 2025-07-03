@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Airline Booking Demand</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    html {
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      overscroll-behavior-x: none;
+      overscroll-behavior-y: contain;
+    }
+    body {
+      background: linear-gradient(to bottom right, #0f172a, #1e293b);
+      color: #f1f5f9;
+    }
+    ::selection {
+      background: #c7d2fe;
+    }
+
+    canvas {
+      max-width: 100%;
+      height: auto !important;
+    }
+
+    li:hover {
+        position: relative;
+        z-index: 10;
+    }
+    
+    .autocomplete-list li {
+        position: relative;
+        z-index: 20;
+    }
+
+    ul.autocomplete-list {
+        z-index: 50;
+    }
+
+    .overflow-fix {
+    position: relative;
+    z-index: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <h1 class="text-2xl font-bold text-center mb-6">✈️ Airline Booking Demand Explorer</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+      
+      <!-- Left: Form -->
+      <div class="bg-gradient-to-br from-gray-800 to-black text-white p-6 rounded shadow">
+        <h2 class="text-lg font-semibold mb-4">Search Flights</h2>
+        <form method="post" action="/search" id="searchForm" class="space-y-4">
+          <div>
+            <label for="origin" class="block text-sm font-medium mb-1">Origin Airport</label>
+            <input id="origin" name="origin" type="text" placeholder="e.g. SYD"
+              class="w-full bg-white/90 text-gray-900 placeholder-gray-600 border-none shadow-none rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
+          </div>
+          <div>
+            <label for="destination" class="block text-sm font-medium mb-1">Destination Airport</label>
+            <input id="destination" name="destination" type="text" placeholder="e.g. MEL"
+              class="w-full bg-white/90 text-gray-900 placeholder-gray-600 border-none shadow-none rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
+          </div>
+          <div>
+            <label for="date" class="block text-sm font-medium mb-1">Departure Date</label>
+            <input id="date" name="date" type="date"
+              class="w-full bg-white/90 text-gray-900 border-none shadow-none rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition" required />
+          </div>
+          <button type="submit"
+            class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 transition text-sm shadow">
+            🔍 Search
+          </button>
+        </form>
+        <div class="mt-6 text-center">
+          <a href="/dashboard"
+            class="inline-block bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 focus:ring-2 focus:ring-green-400 transition text-sm shadow">
+            📊 View Demand Dashboard
+          </a>
+        </div>
+      </div>
+
+      <!-- Right: Results -->
+      <div id="resultsSection" class="space-y-6 overflow-fix">
+        {% if summary %}
+        <div class="bg-gradient-to-br from-gray-800 to-black text-white p-6 rounded shadow">
+          <h2 class="text-lg font-semibold mb-2">🛫 Flight Offers ({{ origin }} → {{ destination }})</h2>
+          <ul class="space-y-2 text-sm">
+            {% for offer in summary %}
+            <li class="group relative border border-gray-600 p-2 rounded bg-gray-900 hover:-translate-y-1 hover:scale-105 transition-transform duration-200 ease-in-out cursor-pointer">
+              {{ offer.route }} — ${{ offer.price }}
+              <div class="absolute hidden group-hover:block text-xs text-white bg-gray-700 p-2 rounded mt-1 left-0 z-20 w-full shadow-lg">
+                ✈️ Airline: {{ offer.airline }}<br>
+                🛑 Stops: {{ offer.stops }}<br>
+                ⏱ Duration: {{ offer.duration }}
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        {% if popular %}
+        <div class="bg-gradient-to-br from-gray-800 to-black text-white p-6 rounded shadow">
+          <h2 class="text-lg font-semibold mb-2">🔥 Popular Routes</h2>
+          <ul class="space-y-2 text-sm">
+            {% for route, count in popular %}
+            <li class="border border-gray-600 p-2 rounded bg-gray-900">{{ route }} <span class="text-gray-400">(Seen {{ count }} times)</span></li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        {% if summary %}
+        <div class="bg-gradient-to-br from-gray-800 to-black text-white p-6 rounded shadow">
+          <h2 class="text-lg font-semibold mb-2">📉 Price Trend</h2>
+          <canvas id="priceChart" class="w-full h-64 bg-gray-900 rounded"></canvas>
+        </div>
+
+        <div class="bg-gradient-to-br from-gray-800 to-black text-white p-6 rounded shadow">
+          <h2 class="text-lg font-semibold mb-2">⏱ Flight Duration Chart</h2>
+          <canvas id="durationChart" class="w-full h-64 bg-gray-900 rounded"></canvas>
+        </div>
+
+        <script src="/static/chart.js"></script>
+        <script>
+          const flightData = {{ summary | tojson | safe }};
+          window.renderChart(flightData);
+
+          const durationCtx = document.getElementById("durationChart").getContext("2d");
+          const durationData = {
+            labels: flightData.map(f => f.route),
+            datasets: [{
+              label: 'Duration (hrs)',
+              data: flightData.map(f => {
+                const match = f.duration.match(/PT(\d+)H(\d+)?M?/);
+                return match ? parseInt(match[1]) + (parseInt(match[2]) || 0) / 60 : 0;
+              }),
+              backgroundColor: "#60a5fa"
+            }]
+          };
+          new Chart(durationCtx, {
+            type: 'bar',
+            data: durationData,
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { display: false }
+              }
+            }
+          });
+        </script>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Scroll to results -->
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      const results = document.getElementById("resultsSection");
+      if (results && results.offsetHeight > 0) {
+        results.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  </script>
+
+  <!-- Autocomplete -->
+  <script>
+    async function setupAutocomplete(id) {
+      const input = document.getElementById(id);
+      const list = document.createElement('ul');
+      list.className = "autocomplete-list absolute z-50 bg-white text-black ...";
+      input.parentNode.appendChild(list);
+
+      input.addEventListener("input", async () => {
+        const q = input.value.trim();
+        if (q.length < 2) return list.innerHTML = '';
+
+        try {
+          const res = await fetch(`/api/suggest?q=${q}`);
+          const data = await res.json();
+          list.innerHTML = '';
+
+          for (const s of data) {
+            const li = document.createElement("li");
+            li.className = "px-3 py-1 hover:bg-blue-100 cursor-pointer";
+            li.textContent = `${s.iataCode} - ${s.name}, ${s.city}`;
+            li.onclick = () => {
+              input.value = s.iataCode;
+              list.innerHTML = '';
+            };
+            list.appendChild(li);
+          }
+        } catch (err) {
+          console.error("Autocomplete error:", err);
+        }
+      });
+
+      input.addEventListener("blur", () => {
+        setTimeout(() => list.innerHTML = '', 150);
+      });
+    }
+
+    setupAutocomplete("origin");
+    setupAutocomplete("destination");
+  </script>
+</body>
+</html>
