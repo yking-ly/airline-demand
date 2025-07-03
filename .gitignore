@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Editor folders
+.vscode/
+.idea/
+
+# Mac/Linux/Windows files
+.DS_Store
+Thumbs.db
+
+# Python environment
+*.egg-info/
+.eggs/
+*.egg
+
+# Database and logs
+*.sqlite3
+*.db
+*.log
+
+# ENV file
+.env
+
+# Uvicorn reload artifacts
+.watchfiles/
